@@ -1,0 +1,634 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Brain Rot Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,400;0,500&display=swap">
+
+<style>
+:root {
+  --bg: #08080f;
+  --surface: #12121e;
+  --surface2: #1c1c2e;
+  --surface3: #26263e;
+  --fg: #ddddf0;
+  --fg-muted: #6868a0;
+  --accent: #ff2d78;
+  --accent2: #a855f7;
+  --cyan: #00e5ff;
+  --toxic: #39ff14;
+  --toxic-dim: #1a6608;
+  --warn: #ffc107;
+  --border: rgba(255,255,255,0.07);
+  color-scheme: dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--fg);font-family:'DM Sans',sans-serif;overflow:hidden}
+.app{display:flex;height:100%;overflow:hidden}
+/* Feed */
+.feed-panel{flex:0 0 54%;display:flex;flex-direction:column;border-right:1px solid var(--border);min-width:0}
+.feed-hdr{padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.feed-hdr-logo{font-size:1.3rem}
+.feed-hdr h1{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.feed-hdr-sub{font-size:.72rem;color:var(--fg-muted);margin-left:auto}
+.feed-scroll{flex:1;overflow-y:auto;padding:10px max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));scroll-behavior:smooth}
+.feed-scroll::-webkit-scrollbar{width:3px}
+.feed-scroll::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+/* Cards */
+.vcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s;user-select:none}
+.vcard:hover{border-color:rgba(255,255,255,.15);transform:translateY(-1px)}
+.vcard:active{transform:scale(.98)}
+.vcard.watching{border-color:var(--accent);box-shadow:0 0 16px rgba(255,45,120,.25)}
+.vcard.watched{opacity:.55}
+.vthumb{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;font-size:2.8rem;position:relative;overflow:hidden}
+.vthumb-watched{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:1.6rem;opacity:0;transition:opacity .3s}
+.vcard.watched .vthumb-watched{opacity:1}
+.vinfo{padding:8px 12px 10px}
+.vtitle{font-size:.85rem;font-weight:500;line-height:1.4;margin-bottom:5px}
+.vmeta{display:flex;align-items:center;gap:6px;font-size:.7rem;color:var(--fg-muted)}
+.vmeta-creator{font-weight:500}
+.dtag{padding:2px 7px;border-radius:20px;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
+.dtag-low{background:rgba(0,229,255,.12);color:var(--cyan)}
+.dtag-mid{background:rgba(255,193,7,.12);color:var(--warn)}
+.dtag-high{background:rgba(255,45,120,.15);color:var(--accent)}
+.dtag-toxic{background:rgba(57,255,20,.12);color:var(--toxic)}
+/* Brain panel */
+.brain-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;padding-right:max(0px,env(safe-area-inset-right,0px))}
+.brain-hdr{padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.brain-hdr h2{font-family:'Syne',sans-serif;font-size:.72rem;font-weight:700;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.12em}
+.brain-content{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px 14px;gap:10px;overflow:hidden;min-height:0}
+.canv-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0;position:relative}
+canvas{display:block}
+.brain-status{font-family:'Syne',sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-align:center;flex-shrink:0}
+/* Bars */
+.bar-wrap{width:100%;flex-shrink:0}
+.bar-label{display:flex;justify-content:space-between;margin-bottom:5px;font-size:.68rem}
+.bar-label span:first-child{font-family:'Syne',sans-serif;font-weight:700;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.07em}
+.bar-label span:last-child{font-variant-numeric:tabular-nums;font-weight:500}
+.bar-track{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .5s ease,background .5s ease}
+.dopa-fill{height:100%;border-radius:4px;background:var(--cyan);transition:width .3s ease}
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;flex-shrink:0}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:8px 11px}
+.stat-lbl{font-size:.6rem;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.stat-val{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;font-variant-numeric:tabular-nums}
+/* Detox */
+.detox-btn{background:rgba(57,255,20,.08);border:1px solid var(--toxic-dim);color:var(--toxic);border-radius:20px;padding:7px 18px;font-family:'Syne',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:background .2s;flex-shrink:0}
+.detox-btn:hover{background:rgba(57,255,20,.18)}
+.detox-btn:disabled{opacity:.35;cursor:not-allowed}
+/* Fact popup */
+.fact{position:fixed;bottom:20px;right:16px;max-width:260px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent2);border-radius:10px;padding:11px 14px;font-size:.78rem;line-height:1.55;z-index:100;transform:translateY(16px);opacity:0;transition:transform .3s,opacity .3s;pointer-events:none}
+.fact.show{transform:translateY(0);opacity:1}
+.fact-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);font-family:'Syne',sans-serif;font-weight:700;margin-bottom:4px}
+/* Float */
+.float{position:fixed;font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--cyan);pointer-events:none;z-index:200;animation:floatUp 1.1s forwards}
+@keyframes floatUp{0%{transform:translateY(0) scale(.6);opacity:1}60%{transform:translateY(-45px) scale(1.05);opacity:1}100%{transform:translateY(-80px) scale(.8);opacity:0}}
+/* Game over */
+.gameover{position:fixed;inset:0;background:rgba(8,8,15,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:300;opacity:0;pointer-events:none;transition:opacity .6s;text-align:center;padding:24px}
+.gameover.show{opacity:1;pointer-events:all}
+.gameover-brain{font-size:5rem;margin-bottom:12px;filter:drop-shadow(0 0 20px #39ff14)}
+.gameover h2{font-family:'Syne',sans-serif;font-size:2.4rem;font-weight:800;color:var(--toxic);margin-bottom:12px;line-height:1.1;text-shadow:0 0 30px rgba(57,255,20,.5)}
+.gameover p{color:var(--fg-muted);font-size:.9rem;line-height:1.7;max-width:380px;margin-bottom:20px}
+.restart-btn{background:var(--accent);color:#fff;border:none;border-radius:30px;padding:13px 30px;font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .2s}
+.restart-btn:hover{transform:scale(1.06);box-shadow:0 0 20px rgba(255,45,120,.4)}
+/* Detox overlay */
+.detoxing{position:fixed;inset:0;background:rgba(8,8,15,.7);display:flex;align-items:center;justify-content:center;z-index:250;opacity:0;pointer-events:none;transition:opacity .4s;flex-direction:column;gap:16px}
+.detoxing.show{opacity:1;pointer-events:all}
+.detoxing p{font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;color:var(--toxic);text-align:center;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+/* Mobile */
+@media(max-width:600px){
+  .app{flex-direction:column}
+  .feed-panel{flex:0 0 58%;border-right:none;border-bottom:1px solid var(--border)}
+  .brain-panel{flex:1}
+  .stats-grid{grid-template-columns:repeat(4,1fr)}
+  .stat-val{font-size:.85rem}
+  .canv-wrap{max-height:110px}
+  .fact{right:8px;max-width:220px}
+}
+</style>
+
+<div class="app">
+  <div class="feed-panel">
+    <div class="feed-hdr">
+      <span class="feed-hdr-logo">📲</span>
+      <h1>ForYouPage</h1>
+      <span class="feed-hdr-sub">∞ videos</span>
+    </div>
+    <div class="feed-scroll" id="feedScroll"></div>
+  </div>
+
+  <div class="brain-panel">
+    <div class="brain-hdr"><h2>Your Brain</h2></div>
+    <div class="brain-content">
+      <div class="bar-wrap">
+        <div class="bar-label">
+          <span>Brain Health</span>
+          <span id="hPct">100%</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="hBar"></div></div>
+      </div>
+      <div class="canv-wrap" id="canvWrap">
+        <canvas id="brainCanvas"></canvas>
+      </div>
+      <div class="brain-status" id="brainStatus">Fully Functional 🟢</div>
+      <div class="bar-wrap">
+        <div class="bar-label">
+          <span>Dopamine</span>
+          <span id="dPct">50%</span>
+        </div>
+        <div class="bar-track"><div class="dopa-fill" id="dBar" style="width:50%"></div></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat"><div class="stat-lbl">Videos</div><div class="stat-val" id="sVid">0</div></div>
+        <div class="stat"><div class="stat-lbl">Time Wasted</div><div class="stat-val" id="sTime">0:00</div></div>
+        <div class="stat"><div class="stat-lbl">Attn Span</div><div class="stat-val" id="sAttn">100%</div></div>
+        <div class="stat"><div class="stat-lbl">Dopamine Hits</div><div class="stat-val" id="sDopa">0</div></div>
+      </div>
+      <button class="detox-btn" id="detoxBtn" onclick="doDetox()">🌿 Digital Detox</button>
+    </div>
+  </div>
+</div>
+
+<div class="fact" id="factEl">
+  <div class="fact-lbl">🧠 Neuroscience</div>
+  <div id="factText"></div>
+</div>
+
+<div class="detoxing" id="detoxEl">
+  <div style="font-size:3rem">🌿</div>
+  <p>Detoxing your brain…</p>
+</div>
+
+<div class="gameover" id="gameoverEl">
+  <div class="gameover-brain">🧠</div>
+  <h2>BRAIN FULLY ROTTED</h2>
+  <p id="gameoverStats">Loading stats…</p>
+  <button class="restart-btn" onclick="restart()">Restart (or touch grass)</button>
+</div>
+
+<script>
+// ── Data ────────────────────────────────────────────────────────────────
+const VIDS = [
+  {emoji:'🐱',title:"this cat absolutely refuses to accept reality",creator:"@fluffymememaster",views:"2.3M",type:"cute",dmg:3,grad:"135deg,#0d2a35,#1a4a5a",
+   fact:"Cute content triggers oxytocin, but diminishing returns kick in fast — each cat video delivers slightly less joy than the last."},
+  {emoji:'😱',title:"I can't believe they ACTUALLY did this (gone wrong)",creator:"@drama.daily99",views:"8.9M",type:"outrage",dmg:8,grad:"135deg,#2a0808,#5a1010",
+   fact:"Outrage content floods your body with cortisol. Your brain cannot distinguish online drama from a real physical threat."},
+  {emoji:'🤯',title:"5 things doctors DESPERATELY don't want you to know",creator:"@truth.unlocked",views:"14.2M",type:"conspiracy",dmg:10,grad:"135deg,#0d0d2a,#1e1050",
+   fact:"Misinformation activates your amygdala while reducing activity in your prefrontal cortex — the part that evaluates whether things are actually true."},
+  {emoji:'💃',title:"POV: you found $100 in your old jacket",creator:"@relatable.content",views:"5.1M",type:"lifestyle",dmg:4,grad:"135deg,#0d1f2d,#154060",
+   fact:"Social comparison content activates the same neural pain pathways as physical pain. Every 'perfect life' you see registers as a small injury."},
+  {emoji:'😂',title:"try not to laugh compilation (WARNING: impossible)",creator:"@compilations4ever",views:"22.8M",type:"meme",dmg:4,grad:"135deg,#201508,#3d2808",
+   fact:"Meme compilations deliver dopamine so rapidly that your baseline dopamine level gradually drops, making ordinary life feel flat."},
+  {emoji:'🐶',title:"puppy hears the word 'walkies' for the very first time",creator:"@dogsarebetter",views:"31.5M",type:"cute",dmg:2,grad:"135deg,#0e250e,#1a4a1a",
+   fact:"Even positive content trains your brain to need constant novelty. The real cost is how it rewires your expectations of real life."},
+  {emoji:'🤬',title:"unpopular opinion: everything is terrible and here's why",creator:"@hot_takes_daily",views:"4.7M",type:"outrage",dmg:9,grad:"135deg,#250404,#5a0808",
+   fact:"Anger is the most viral emotion online. Rage content spreads 6× faster than neutral content — and your brain's threat response doesn't turn off easily."},
+  {emoji:'✨',title:"girlies you NEED this in your life (not sponsored 🙏)",creator:"@influencer.promo",views:"3.2M",type:"lifestyle",dmg:5,grad:"135deg,#180d25,#350d50",
+   fact:"Ads disguised as authentic content activate the same FOMO response as real social experiences. Your brain processes them as genuine desire."},
+  {emoji:'🎭',title:"I gave strangers $10,000 and filmed their reaction",creator:"@viral.gooddeed",views:"19.6M",type:"drama",dmg:6,grad:"135deg,#0d1f0d,#153520",
+   fact:"Watching feel-good content can boost oxytocin briefly, but it substitutes for real social connection rather than supplementing it."},
+  {emoji:'💀',title:"this video ended SO differently than I expected",creator:"@fail.compilation",views:"7.3M",type:"meme",dmg:5,grad:"135deg,#111111,#222222",
+   fact:"Failure and surprise content exploits your brain's prediction-error system. Each unexpected outcome delivers dopamine — and a craving for more."},
+  {emoji:'🔥',title:"Gordon Ramsay absolutely destroys home cook for 9 minutes straight",creator:"@best.compilations",views:"45.1M",type:"drama",dmg:7,grad:"135deg,#280900,#561400",
+   fact:"Compilations remove every moment of boredom, training your brain to reject content that isn't perfectly paced. Books start to feel impossible."},
+  {emoji:'📱',title:"this life hack will change EVERYTHING (scientists hate it)",creator:"@productivity.guru",views:"9.8M",type:"conspiracy",dmg:8,grad:"135deg,#081525,#103050",
+   fact:"Your brain spends real cognitive resources evaluating false claims, even ones you immediately dismiss. Pseudoscience content creates measurable mental fatigue."},
+  {emoji:'😭',title:"storytime: my worst date ever — he did WHAT at the restaurant",creator:"@storytime.queen",views:"12.4M",type:"drama",dmg:7,grad:"135deg,#1a051a,#350535",
+   fact:"Parasocial storytelling activates the same brain regions as real gossip. Your brain treats a stranger's drama as if it affects your actual social circle."},
+  {emoji:'🌅',title:"living my best life in Bali — day 47 of my digital nomad era",creator:"@nomad.life",views:"2.8M",type:"lifestyle",dmg:6,grad:"135deg,#0d1a25,#0a2a35",
+   fact:"Aspirational content creates an 'arrival fallacy' loop — you believe happiness lies just beyond your current state, making the present feel perpetually inadequate."},
+  {emoji:'🤡',title:"I let AI make every decision in my life for 30 days",creator:"@ai.chaos",views:"6.1M",type:"meme",dmg:4,grad:"135deg,#0d0d1a,#181530",
+   fact:"Novelty-seeking content keeps you in perpetual anticipation. Your brain starts to feel that any moment without stimulation is being wasted."},
+  {emoji:'⚡',title:"you need to hear this harsh truth nobody tells you",creator:"@lifecoach.bro",views:"18.2M",type:"outrage",dmg:8,grad:"135deg,#1a1000,#352000",
+   fact:"'Harsh truth' content exploits your brain's negativity bias. Bad news gets 3× more cognitive processing than good news — it's not insight, it's exploitation."},
+  {emoji:'👀',title:"she didn't know I was watching (caught on camera)",creator:"@pranks.daily",views:"27.3M",type:"drama",dmg:7,grad:"135deg,#1a0d0d,#302010",
+   fact:"Voyeuristic content activates reward circuits similar to social bonding, but without the reciprocity that makes real connection meaningful."},
+  {emoji:'🧃',title:"eating only 'healthy' food for 30 days — my honest results",creator:"@wellness.era",views:"4.4M",type:"lifestyle",dmg:5,grad:"135deg,#0d1f10,#153520",
+   fact:"Wellness content creates anxiety about health choices that paradoxically increases cortisol — the stress hormone most harmful to long-term health."},
+  {emoji:'🎵',title:"this song has been LIVING in my head for 3 weeks",creator:"@trending.audio",views:"55.8M",type:"meme",dmg:3,grad:"135deg,#0d0820,#1a1040",
+   fact:"Earworm content exploits involuntary musical imagery, occupying cognitive resources you'd otherwise use for focused thought."},
+  {emoji:'🚨',title:"BREAKING: this changes everything (not clickbait)",creator:"@news.now",views:"33.1M",type:"conspiracy",dmg:9,grad:"135deg,#200505,#450a0a",
+   fact:"Breaking news anxiety activates your brain's threat-detection system continuously, creating chronic low-level stress that erodes decision-making capacity."},
+];
+
+const TYPE_TAGS = {cute:'dtag-low',meme:'dtag-low',lifestyle:'dtag-mid',drama:'dtag-mid',outrage:'dtag-high',conspiracy:'dtag-toxic'};
+const TYPE_LABEL = {cute:'Cute',meme:'Meme',lifestyle:'Lifestyle',drama:'Drama',outrage:'Outrage',conspiracy:'⚠️ Conspiracy'};
+
+// ── State ────────────────────────────────────────────────────────────────
+let S = {};
+function initState() {
+  S = {
+    health: 100,
+    dopamine: 50,
+    attention: 100,
+    videos: 0,
+    dopaHits: 0,
+    startTime: Date.now(),
+    watched: new Set(),
+    cardPool: [...VIDS],
+    animTime: 0,
+    detoxing: false,
+    over: false,
+    dopaDecay: 0,
+  };
+}
+
+// ── DOM ──────────────────────────────────────────────────────────────────
+const feedScroll = document.getElementById('feedScroll');
+const canvas = document.getElementById('brainCanvas');
+const ctx = canvas.getContext('2d');
+const hBar = document.getElementById('hBar');
+const hPct = document.getElementById('hPct');
+const dBar = document.getElementById('dBar');
+const dPct = document.getElementById('dPct');
+const brainStatus = document.getElementById('brainStatus');
+const sVid = document.getElementById('sVid');
+const sTime = document.getElementById('sTime');
+const sAttn = document.getElementById('sAttn');
+const sDopa = document.getElementById('sDopa');
+const factEl = document.getElementById('factEl');
+const factText = document.getElementById('factText');
+const detoxEl = document.getElementById('detoxEl');
+const gameoverEl = document.getElementById('gameoverEl');
+const detoxBtn = document.getElementById('detoxBtn');
+
+// ── Canvas sizing ────────────────────────────────────────────────────────
+function sizeCanvas() {
+  const wrap = document.getElementById('canvWrap');
+  const sz = Math.min(wrap.clientWidth, wrap.clientHeight);
+  canvas.width = sz; canvas.height = sz;
+}
+window.addEventListener('resize', sizeCanvas);
+
+// ── Feed rendering ───────────────────────────────────────────────────────
+function shuffle(arr) {
+  for (let i=arr.length-1;i>0;i--){const j=~~(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}
+  return arr;
+}
+
+function buildCard(v, idx) {
+  const div = document.createElement('div');
+  div.className = 'vcard';
+  div.dataset.idx = idx;
+  div.innerHTML = `
+    <div class="vthumb" style="background:linear-gradient(${v.grad})">
+      <span>${v.emoji}</span>
+      <div class="vthumb-watched">✅ Watched</div>
+    </div>
+    <div class="vinfo">
+      <div class="vtitle">${v.title}</div>
+      <div class="vmeta">
+        <span class="vmeta-creator">${v.creator}</span>
+        <span>·</span>
+        <span>${v.views} views</span>
+        <span class="dtag ${TYPE_TAGS[v.type]}">${TYPE_LABEL[v.type]}</span>
+      </div>
+    </div>`;
+  div.addEventListener('click', () => watchVideo(div, v));
+  return div;
+}
+
+function renderFeed() {
+  feedScroll.innerHTML = '';
+  const pool = shuffle([...VIDS]);
+  pool.forEach((v,i) => feedScroll.appendChild(buildCard(v, i)));
+  // Load more on scroll
+  feedScroll.addEventListener('scroll', onFeedScroll);
+}
+
+let loadingMore = false;
+function onFeedScroll() {
+  if (S.over || S.detoxing) return;
+  const {scrollTop, scrollHeight, clientHeight} = feedScroll;
+  if (scrollTop + clientHeight > scrollHeight - 80 && !loadingMore) {
+    loadingMore = true;
+    const more = shuffle([...VIDS]).slice(0, 8);
+    more.forEach((v,i) => feedScroll.appendChild(buildCard(v, feedScroll.children.length + i)));
+    setTimeout(() => loadingMore = false, 400);
+  }
+}
+
+// ── Watch video ──────────────────────────────────────────────────────────
+let factTimer = null;
+function watchVideo(el, v) {
+  if (S.over || S.detoxing || el.classList.contains('watching')) return;
+  el.classList.add('watching');
+  setTimeout(() => {
+    el.classList.remove('watching');
+    el.classList.add('watched');
+  }, 600);
+
+  // Apply damage
+  S.health = Math.max(0, S.health - v.dmg);
+  S.dopamine = Math.min(100, S.dopamine + 22 + Math.random()*15);
+  S.attention = Math.max(0, S.attention - (v.dmg * 0.6));
+  S.videos++;
+  S.dopaHits++;
+  S.dopaDecay = 0;
+
+  // Dopamine float
+  const rect = el.getBoundingClientRect();
+  spawnFloat(rect.left + rect.width/2, rect.top + 30, '+DOPAMINE');
+
+  // Show fact
+  showFact(v.fact);
+
+  updateUI();
+  if (S.health <= 0) gameOver();
+}
+
+function spawnFloat(x, y, text) {
+  const el = document.createElement('div');
+  el.className = 'float';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+function showFact(text) {
+  factText.textContent = text;
+  factEl.classList.add('show');
+  clearTimeout(factTimer);
+  factTimer = setTimeout(() => factEl.classList.remove('show'), 5000);
+}
+
+// ── Detox ────────────────────────────────────────────────────────────────
+function doDetox() {
+  if (S.detoxing || S.over || S.health >= 95) return;
+  S.detoxing = true;
+  detoxBtn.disabled = true;
+  detoxEl.classList.add('show');
+  showFact("Digital detox increases gray matter density in the prefrontal cortex within weeks. Your brain genuinely heals when given space.");
+
+  let t = 0;
+  const interval = setInterval(() => {
+    t++;
+    S.health = Math.min(100, S.health + 2);
+    S.attention = Math.min(100, S.attention + 3);
+    S.dopamine = Math.max(40, S.dopamine - 3);
+    updateUI();
+    if (t >= 15) {
+      clearInterval(interval);
+      S.detoxing = false;
+      detoxEl.classList.remove('show');
+      setTimeout(() => detoxBtn.disabled = false, 3000);
+    }
+  }, 200);
+}
+
+// ── Game over ────────────────────────────────────────────────────────────
+function gameOver() {
+  S.over = true;
+  S.health = 0;
+  updateUI();
+  const elapsed = Math.floor((Date.now() - S.startTime) / 1000);
+  const mins = Math.floor(elapsed/60), secs = elapsed%60;
+  document.getElementById('gameoverStats').innerHTML =
+    `You watched <strong>${S.videos}</strong> videos and wasted <strong>${mins}m ${secs}s</strong> of your one precious life.<br><br>
+    Your attention span dropped to <strong>${~~S.attention}%</strong> and you received <strong>${S.dopaHits}</strong> artificial dopamine hits.<br><br>
+    The good news: neuroplasticity means your brain can recover. Close the app. Go outside.`;
+  setTimeout(() => gameoverEl.classList.add('show'), 400);
+}
+
+function restart() {
+  gameoverEl.classList.remove('show');
+  initState();
+  renderFeed();
+  feedScroll.scrollTop = 0;
+  updateUI();
+}
+
+// ── UI update ────────────────────────────────────────────────────────────
+function updateUI() {
+  const h = S.health;
+  // Health bar
+  hBar.style.width = h + '%';
+  hBar.style.background = h > 60 ? `hsl(${90+h*0.5},65%,45%)` : h > 30 ? `hsl(${h*2},75%,50%)` : `hsl(${h*1.2},85%,48%)`;
+  hPct.textContent = ~~h + '%';
+  // Dopamine bar
+  dBar.style.width = S.dopamine + '%';
+  dPct.textContent = ~~S.dopamine + '%';
+  // Status
+  const stages = [
+    [80,'Fully Functional 🟢'],
+    [60,'Mildly Distracted 🟡'],
+    [40,'Attention Compromised ⚠️'],
+    [20,'Reward Pathways Hijacked 🔴'],
+    [5, 'Critical Brain Rot ☣️'],
+    [0, 'Total Brain Rot 💀'],
+  ];
+  for (const [thresh, label] of stages) {
+    if (h >= thresh) { brainStatus.textContent = label; break; }
+  }
+  brainStatus.style.color = h > 60 ? '#7aef7a' : h > 30 ? 'var(--warn)' : 'var(--accent)';
+  // Stats
+  sVid.textContent = S.videos;
+  const elapsed = Math.floor((Date.now() - S.startTime)/1000);
+  sTime.textContent = `${~~(elapsed/60)}:${String(elapsed%60).padStart(2,'0')}`;
+  sAttn.textContent = ~~S.attention + '%';
+  sDopa.textContent = S.dopaHits;
+}
+
+// ── Brain drawing ────────────────────────────────────────────────────────
+function pseudo(n) {
+  const x = Math.sin(n*127.1+311.7)*43758.5453;
+  return x - Math.floor(x);
+}
+function lerp(a,b,t){return a+(b-a)*Math.max(0,Math.min(1,t))}
+
+function drawBrain(health, dopamine, t) {
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  if (!W||!H) return;
+
+  const cx=W/2, cy=H/2;
+  const sz=Math.min(W,H)*0.42;
+  const hf=health/100;
+
+  // Health color: pink→sickly green
+  const cr=~~lerp(25,228,hf);
+  const cg=~~lerp(145,105,hf);
+  const cb=~~lerp(18,128,hf);
+
+  const pulse=1+Math.sin(t*1.8)*0.013*Math.max(0.15,hf);
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.scale(pulse,pulse);
+
+  // Glow when unhealthy
+  if (health<60) {
+    const g=ctx.createRadialGradient(0,0,sz*0.4,0,0,sz*1.7);
+    g.addColorStop(0,'rgba(57,255,20,0)');
+    g.addColorStop(1,`rgba(57,255,20,${(60-health)/110})`);
+    ctx.fillStyle=g;
+    ctx.beginPath();ctx.arc(0,0,sz*1.7,0,Math.PI*2);ctx.fill();
+  }
+
+  // Draw hemispheres
+  function hemisphere(flip) {
+    ctx.save();
+    if(flip) ctx.scale(-1,1);
+
+    const p=new Path2D();
+    p.moveTo(0,-sz*.88);
+    p.bezierCurveTo(-sz*.08,-sz*.92,-sz*.62,-sz*.78,-sz*.8,-sz*.38);
+    p.bezierCurveTo(-sz*.95,-sz*.02,-sz*.9,sz*.42,-sz*.66,sz*.7);
+    p.bezierCurveTo(-sz*.44,sz*.9,-sz*.14,sz*.87,0,sz*.82);
+    p.closePath();
+
+    // Gradient fill
+    const g=ctx.createRadialGradient(-sz*.32,-sz*.32,sz*.05,-sz*.18,-sz*.12,sz*.9);
+    g.addColorStop(0,`rgb(${Math.min(255,cr+38)},${Math.min(255,cg+28)},${Math.min(255,cb+42)})`);
+    g.addColorStop(.55,`rgb(${cr},${cg},${cb})`);
+    g.addColorStop(1,`rgb(${~~(cr*.62)},${~~(cg*.68)},${~~(cb*.62)})`);
+    ctx.fillStyle=g;
+    ctx.fill(p);
+    ctx.strokeStyle=`rgba(${~~(cr*.48)},${~~(cg*.52)},${~~(cb*.48)},.75)`;
+    ctx.lineWidth=sz*.022;
+    ctx.stroke(p);
+
+    // Clip for gyri
+    ctx.save();
+    ctx.clip(p);
+    ctx.strokeStyle=`rgba(${~~(cr*.5)},${~~(cg*.55)},${~~(cb*.5)},.42)`;
+    ctx.lineWidth=sz*.016;
+    ctx.lineCap='round';
+    for(let i=0;i<7;i++){
+      const yB=-sz*.76+i*sz*.235;
+      ctx.beginPath();
+      for(let s=0;s<=26;s++){
+        const x=-sz*.88+(s/26)*sz*.88;
+        const w=Math.sin(s/26*Math.PI*3.8+i*1.5)*sz*.042;
+        s===0?ctx.moveTo(x,yB+w):ctx.lineTo(x,yB+w);
+      }
+      ctx.stroke();
+    }
+
+    // Rot spots
+    if(health<78){
+      const n=~~((78-health)/8)+1;
+      ctx.globalAlpha=Math.min(.85,(78-health)/52);
+      for(let i=0;i<n;i++){
+        const sx=-sz*(.12+pseudo(i*3+1)*.65);
+        const sy=-sz*(.55-pseudo(i*3+2));
+        const sr=sz*(.05+pseudo(i*3)*.07);
+        ctx.fillStyle=health>45?'rgba(18,115,8,1)':'rgba(57,255,20,.75)';
+        ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='rgba(4,50,2,.55)';
+        ctx.beginPath();ctx.arc(sx,sy,sr*.5,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+
+    // Cracks at low health
+    if(health<38){
+      const alpha=(38-health)/42;
+      ctx.strokeStyle=`rgba(0,0,0,${alpha*.75})`;
+      ctx.lineWidth=sz*.009;
+      ctx.globalAlpha=alpha;
+      for(let i=0;i<3;i++){
+        const sx=-sz*(.15+pseudo(i*5)*.55);
+        const sy=-sz*(.35-pseudo(i*5+1)*.7);
+        ctx.beginPath();ctx.moveTo(sx,sy);
+        for(let j=0;j<5;j++){
+          const ex=sx+(pseudo(i*5+j+2)-.5)*sz*.32;
+          const ey=sy+(pseudo(i*5+j+3)-.5)*sz*.32;
+          ctx.lineTo(ex,ey);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
+
+    ctx.restore(); // unclip
+    ctx.restore(); // unflip
+  }
+
+  hemisphere(false);
+  hemisphere(true);
+
+  // Center fissure
+  ctx.beginPath();
+  ctx.moveTo(0,-sz*.88);
+  for(let y=-sz*.88;y<=sz*.82;y+=sz*.038){
+    const x=Math.sin(y/sz*4.2+t*.35)*sz*.013;
+    ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle=`rgba(${~~(cr*.44)},${~~(cg*.48)},${~~(cb*.44)},.88)`;
+  ctx.lineWidth=sz*.038;
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.stroke();
+
+  // Dopamine sparkles
+  if(dopamine>55){
+    const n=~~((dopamine-55)/9)+2;
+    for(let i=0;i<n;i++){
+      const a=t*2.4+i*(Math.PI*2/n);
+      const d=sz*(.44+i%2*.22);
+      const sx=Math.cos(a)*d, sy=Math.sin(a)*d*.62;
+      const sz2=sz*.048*(0.8+Math.sin(t*5.5+i)*.22);
+      ctx.fillStyle=`rgba(0,229,255,${.5+dopamine/260})`;
+      ctx.beginPath();
+      for(let p=0;p<8;p++){
+        const pa=p*Math.PI/4, pr=p%2===0?sz2:sz2*.35;
+        p===0?ctx.moveTo(sx+Math.cos(pa)*pr,sy+Math.sin(pa)*pr):ctx.lineTo(sx+Math.cos(pa)*pr,sy+Math.sin(pa)*pr);
+      }
+      ctx.closePath();ctx.fill();
+    }
+  }
+
+  // Ooze drips at critical
+  if(health<22){
+    const n=~~((22-health)/4)+1;
+    for(let i=0;i<n;i++){
+      const dx=sz*(-.7+i*.35);
+      const phase=((t*.65+i*1.4)%(Math.PI));
+      const dy=sz*.72+phase/Math.PI*sz*.42;
+      ctx.fillStyle=`rgba(57,255,20,${.6+Math.sin(phase)*.3})`;
+      ctx.beginPath();
+      ctx.ellipse(dx,dy,sz*.023,sz*.058,0,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+// ── Game loop ────────────────────────────────────────────────────────────
+let lastTs=0;
+function loop(ts) {
+  const dt=(ts-lastTs)/1000; lastTs=ts;
+  S.animTime+=dt;
+
+  // Dopamine decay
+  S.dopaDecay+=dt;
+  if(S.dopaDecay>1.5){
+    S.dopamine=Math.max(35, S.dopamine-dt*8);
+  }
+
+  // Passive attention decay while scrolling
+  if(!S.over && !S.detoxing){
+    S.attention=Math.max(0, S.attention-dt*0.12);
+  }
+
+  // Update stats every second
+  updateUI();
+
+  // Draw brain
+  sizeCanvas();
+  drawBrain(S.health, S.dopamine, S.animTime);
+
+  requestAnimationFrame(loop);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+initState();
+renderFeed();
+sizeCanvas();
+requestAnimationFrame(loop);
+</script>
+
+</body></html>
